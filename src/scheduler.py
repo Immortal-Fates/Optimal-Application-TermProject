@@ -36,6 +36,7 @@ def compute_costs(lengths: Sequence[int], max_k: int, cost_type: str) -> List[fl
 
 class DynamicBatchScheduler:
     """Exact min-max scheduler using enumeration for small world_size."""
+
     def __init__(self, world_size: int, cost_type: str) -> None:
         self.world_size = world_size
         self.cost_type = cost_type
@@ -81,7 +82,9 @@ class DynamicBatchScheduler:
                 if max_cost > best_max:
                     return
                 var_cost = float(np.var(costs))
-                if max_cost < best_max or (math.isclose(max_cost, best_max) and var_cost < best_var):
+                if max_cost < best_max or (
+                    math.isclose(max_cost, best_max) and var_cost < best_var
+                ):
                     best_max = max_cost
                     best_var = var_cost
                     best_batches = candidate

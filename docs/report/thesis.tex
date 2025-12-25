@@ -78,12 +78,11 @@
 \[
 \text{padded\_tokens}[k] = k \cdot \max\_len[k].
 \]
-考虑两种成本代理：
+该量与注意力计算复杂度一致性较好\cite{Vaswani2017}，因此可作为计算与显存的统一代理。本文采用两种常见代理形式：
 \[
  c_g(k) = \text{padded\_tokens}[k],\quad \text{或}\quad c_g(k) = (\text{padded\_tokens}[k])^2.
 \]
-该代理具有单调性，并与注意力计算复杂度一致性较好\cite{Vaswani2017}。在工程实现中，计算成本与显存开销可用同一代理近似，从而降低建模复杂度。
-
+前者更稳健、后者更强调长序列惩罚。该代理单调可计算，适合在 step 前快速估算。
 \subsection{min-max 整数优化模型}
 
 对每一步，求解以下问题：
@@ -108,8 +107,8 @@
 
 由于 $G=4$ 且 $B$ 不大，本文采用 exact 枚举求解。具体流程：
 \begin{enumerate}
-\item 每个 rank 预取 $K$ 个样本形成 buffer，计算 $c_g(k)$；
-\item 通过 all-gather 将成本数组汇总到 rank0；
+\item 每个 rank 预取 $K$ 个样本形成 buffer，计算 $c_g(k)$ 序列；
+\item 使用 all-gather 将成本数组汇总到 rank0；
 \item rank0 枚举所有满足 $\sum b_g = B$ 的组合，选择 min-max + 最小方差解；
 \item 广播 $b_g$ 给各 rank，按分配取样训练。
 \end{enumerate}
@@ -134,19 +133,19 @@
 
 \subsection{硬件与软件环境}
 
-实验在单机 4 卡环境上完成，GPU 为 4 张 NVIDIA RTX 3090。图\ref{fig:nsmi1} 和图\ref{fig:nsmi2} 为实验前后的 nvidia-smi 截图，用于展示硬件配置与 GPU 占用情况。
+实验在单机 4 卡环境上完成，GPU 为 4 张 NVIDIA RTX 3090。图\ref{fig:nsmi1} 和图\ref{fig:nsmi2} 分别展示优化前后的 nvidia-smi 截图，用于对比 GPU 利用率（GPU-util）与显存占用的变化，从而直观体现调度策略在资源均衡与利用率方面的优势。
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{figures/nvidia-smi1.png}
-\caption{实验环境 nvidia-smi 截图（1）}
+\caption{优化前 nvidia-smi 截图（GPU-util 对比）}
 \label{fig:nsmi1}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{figures/nvidia-smi2.png}
-\caption{实验环境 nvidia-smi 截图（2）}
+\caption{优化后 nvidia-smi 截图（GPU-util 对比）}
 \label{fig:nsmi2}
 \end{figure}
 
