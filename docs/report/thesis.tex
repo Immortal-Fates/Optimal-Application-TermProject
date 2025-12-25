@@ -115,11 +115,11 @@
 
 \subsection{算法复杂度与可实现性}
 
-在 $G=4$ 的场景下，枚举规模随 $B$ 的增长近似为 $O(B^{G-1})$，对本文设定的 batch 范围而言完全可接受。相比启发式调度，exact 枚举具有确定性、可解释性强的优势，适合作为课程项目展示优化求解亮点。
+在 $G=4$ 的场景下，枚举规模随 $B$ 的增长近似为 $O(B^{G-1})$，对本文设定的 batch 范围而言完全可接受。相比启发式调度，exact 枚举具有确定性、可解释性强的优势。
 
 \subsection{工程实现与工具链}
 
-系统实现基于 PyTorch DDP 与 Hugging Face Transformers/Datasets\cite{HFTransformers,HFDatasets}，数据集为 GLUE/SST-2\cite{GLUEBenchmark}，模型为 DistilBERT\cite{DistilBERT}。训练过程记录 per-step 指标并输出到 CSV，分析脚本基于 pandas 与 matplotlib 自动生成图表与汇总表。代码结构遵循模块化设计，调度算法与训练逻辑解耦，便于复现与扩展。
+系统实现基于 PyTorch DDP 与 Hugging Face Transformers/Datasets\cite{HFTransformers,HFDatasets}，数据集为 GLUE/SST-2\cite{GLUEBenchmark}，模型为 DistilBERT\cite{DistilBERT}。训练过程记录 per-step 指标并输出到 CSV，分析脚本基于 pandas 与 matplotlib 自动生成图表与汇总表。
 
 \subsection{关键工程要点}
 
@@ -137,14 +137,14 @@
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\textwidth]{figures/nvidia-smi1.png}
+\includegraphics[width=0.9\textwidth]{figures/nvidia-smi-before.png}
 \caption{优化前 nvidia-smi 截图（GPU-util 对比）}
 \label{fig:nsmi1}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\textwidth]{figures/nvidia-smi2.png}
+\includegraphics[width=0.9\textwidth]{figures/nvidia-smi-after.png}
 \caption{优化后 nvidia-smi 截图（GPU-util 对比）}
 \label{fig:nsmi2}
 \end{figure}
@@ -156,8 +156,8 @@
 \begin{itemize}
 \item 数据集：SST-2（GLUE）
 \item 模型：distilbert-base-uncased
-\item 训练配置：4 GPU，global batch $B=64$，steps=800，max\_length=256
-\item Baseline：static（每卡固定 16）
+\item 训练配置：4 GPU，global batch $B=48$，steps=800，max\_length=256
+\item Baseline：static（每卡固定 12）
 \item 方法：dynamic（per-step min-max 调度，cost=\texttt{tokens}）
 \item buffer size：64，支持更稳定的成本估计
 \end{itemize}
@@ -173,7 +173,7 @@
 
 \subsection{结果与讨论}
 
-表\ref{tab:summary} 汇总了静态与动态调度的对比结果。动态调度在时延和吞吐上均有改善：mean max step time 降低 3.70\%，P95 降低 3.82\%；samples/s 平均提升 3.85\%，P95 提升 4.16\%。更显著的是，跨卡 padded tokens 标准差降低 71.60\%，表明动态调度有效缓解了长度不均衡。需要注意的是，peak memory 标准差略有上升（约 4.12\%），说明在某些步长分配更激进时，仍可能引入显存波动，这为后续调度策略改进提供了方向。
+表\ref{tab:summary} 汇总了静态与动态调度的对比结果。动态调度在时延和吞吐上均有显著改善：mean max step time 降低 17.13\%，P95 降低 17.19\%；samples/s 平均提升 20.68\%，P95 提升 20.58\%。更显著的是，跨卡 padded tokens 标准差降低 70.06\%，同时 peak memory 标准差降低 56.91\%，表明动态调度在负载均衡与显存稳定性上均取得明显收益。
 
 \begin{table}[H]
 \centering
@@ -183,15 +183,15 @@
 \hline
 指标 & Static & Dynamic & 提升(\%) \\
 \hline
-Mean max step time (ms) & 156.80 & 150.99 & -3.70 \\
-P95 max step time (ms) & 161.37 & 155.21 & -3.82 \\
-Mean throughput (samples/s) & 408.27 & 423.97 & +3.85 \\
-P95 throughput (samples/s) & 418.67 & 436.10 & +4.16 \\
-Mean throughput (tokens/s) & 14261.50 & 14456.85 & +1.37 \\
-P95 throughput (tokens/s) & 17276.87 & 17966.80 & +3.99 \\
-Mean std(step time) & 0.327 & 0.307 & -6.10 \\
-Mean std(padded tokens) & 112.06 & 31.83 & -71.60 \\
-Mean std(peak mem) & 1.422 & 1.481 & +4.12 \\
+Mean max step time (ms) & 118.51 & 98.20 & -17.13 \\
+P95 max step time (ms) & 120.96 & 100.17 & -17.19 \\
+Mean throughput (samples/s) & 405.10 & 488.85 & +20.68 \\
+P95 throughput (samples/s) & 413.39 & 498.47 & +20.58 \\
+Mean throughput (tokens/s) & 13302.11 & 15610.87 & +17.36 \\
+P95 throughput (tokens/s) & 16549.53 & 19757.56 & +19.38 \\
+Mean std(step time) & 0.177 & 0.134 & -24.26 \\
+Mean std(padded tokens) & 87.69 & 26.25 & -70.06 \\
+Mean std(peak mem) & 1.489 & 0.642 & -56.91 \\
 \hline
 \end{tabular}
 \end{table}
@@ -239,11 +239,11 @@ Mean std(peak mem) & 1.422 & 1.481 & +4.12 \\
 
 在更激进的设置（如 cost=\texttt{tokens\_sq}）下，虽然 padded tokens 的均衡性更好，但 step time 反而变差，说明代理成本与真实耗时之间仍存在偏差；调度策略需在“均衡性”与“调度开销”之间权衡。此外，过小的 buffer size 会降低成本估计精度，导致分配波动。该部分的负结果为后续改进提供了实践依据。
 
-\section{结论与亮点}
+\section{结论}
 
 本文针对 DDP 变长序列训练的负载不均衡问题，完成了“建模—求解—实验验证”的闭环。实验结果表明，动态 per-GPU micro-batch 调度在保持训练稳定的同时显著改善了跨卡均衡性，并提升了 step time 与吞吐表现。
 
-\textbf{亮点与心得总结：}
+\subsection*{作业总结}
 \begin{enumerate}
 \item 以真实工程问题为载体，完整呈现数学规划建模与求解过程；
 \item 给出 min-max 整数优化的 exact 枚举解，并引入方差 tie-break 强化均衡性；
